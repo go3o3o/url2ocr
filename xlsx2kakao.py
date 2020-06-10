@@ -21,6 +21,8 @@ config = configparser.ConfigParser()
 # Config File 읽기
 config.read(os.path.dirname(os.path.realpath(__file__)) + os.sep + 'envs' + os.sep + 'property.ini')
 
+logging.basicConfig(filename='xlsx2kakao.log', level=logging.INFO)
+
 LIMIT_PX = 1024
 LIMIT_BYTE = 1024*1024  # 1MB
 LIMIT_BOX = 40
@@ -79,7 +81,8 @@ def getFiles(path: str, files: list):
         if os.path.isdir(subpath):
             getFiles(subpath, files)
         else:
-            files.append(subpath)
+            if '.DS_Store' not in subpath:
+                files.append(subpath)
 
 def md5Generator(text: str):
     enc = hashlib.md5()
@@ -88,11 +91,14 @@ def md5Generator(text: str):
     return encText
 
 def main():
-
-    appkeys = ['1', '2', '3']
+    # appkeys = ['7a15ba912156cb0a385669ee411e9cf0', '71d3defc02fedccb628e7b97d455f209', 'dfe46d636db22ea56b4bc115ed547cf8']
+    # 호연, 민찬, 서윤, 다정, 재훈
+    appkeys = ['1b59aa1de7bfadd5a19f168141910b1e', 'f3e8ef229676652a83384b661bf2e59c', '7a15ba912156cb0a385669ee411e9cf0', '71d3defc02fedccb628e7b97d455f209', 'dfe46d636db22ea56b4bc115ed547cf8']
+    # appkeys = ['1', '2', '3']
 
     # xlsx 파일 경로
     xlsxPath = os.path.dirname(os.path.realpath(__file__)) + config['Path']['XlsxPath']
+    xlsxOkPath = os.path.dirname(os.path.realpath(__file__)) + config['Path']['XlsxOkPath']
 
     # result 파일 저장 경로
     resultPath = os.path.dirname(os.path.realpath(__file__)) + config['Path']['ResultPath']
@@ -103,17 +109,23 @@ def main():
     appkey_seq = 0
     appkey = appkeys[appkey_seq]
 
-    print(" @@@@@@@@@@@@@@@ API KEY %s " % appkey)
+    logging.info(" @@@@@@@@@@@@@@@ API KEY %s " % appkey)
 
     xlsxFiles = []
     getFiles(xlsxPath, xlsxFiles)
-    print(" ### xlsx 파일 총 건수 %d " % len(xlsxFiles))
+    logging.info(" ### xlsx 파일 총 건수 %d " % len(xlsxFiles))
 
     row_seq = 0
 
     for xlsxFile in xlsxFiles:
-        print("Step #1. xlsx 파일 읽기 ")
-        print(" ### %s " % xlsxFile)
+        row_seq = 0
+
+        if len(appkeys) <= appkey_seq:
+            logging.info("Step #7. API KEY Expired. %s " % xlsxFile)
+            break
+
+        logging.info("Step #1. xlsx 파일 읽기 ")
+        logging.info(" ### %s " % xlsxFile)
         load_wb = load_workbook(xlsxFile)
         load_ws = load_wb.worksheets[0]
 
@@ -122,22 +134,23 @@ def main():
 
             if row[6].value == "Y":
                 try:
-                    print("Step #2. 이미지 URL -> OCR %d" % row_seq)
-                    print("Step #2-1. %s " % row[4].value)
+                    # logging.info("Step #2. 이미지 URL -> OCR %d" % row_seq)
+                    # logging.info("Step #2-1. %s " % row[4].value)
+                    logging.info("Step #2. 이미지 URL -> OCR %d" % row_seq)
+                    logging.info("Step #2-1. %s " % row[4].value)
                     image = url_to_image(row[4].value)
 
                     resize_image = kakao_ocr_resize(image)
                     if resize_image is not None:
                         image = resize_image
-                        print(" ### 원본 대신 리사이즈된 이미지를 사용합니다.")
+                        logging.info(" ### 원본 대신 리사이즈된 이미지를 사용합니다.")
 
                     output = kakao_ocr_detect(image, appkey).json()
 
-                    if 'result' in output:
-                        boxes = output["result"]["boxes"]
-                    else:
-                        break
+                    if 'result' not in output:
+                        pass
 
+                    boxes = output["result"]["boxes"]
                     boxes = boxes[:min(len(boxes), LIMIT_BOX)]
                     output = kakao_ocr_recognize(image, boxes, appkey).json()
 
@@ -146,19 +159,22 @@ def main():
                     else:
                         ocrResult = ''
 
-                    print("Step #2-2. %s " % ocrResult.strip())
+                    # logging.info("Step #2-2. %s " % ocrResult.strip())
+                    logging.info("Step #2-2. %s " % ocrResult.strip())
 
                     row[5].value = ocrResult.strip()
 
                 except KeyError:
                     appkey_seq += 1
+                    logging.info("KeyError 발생")
                     if len(appkeys) <= appkey_seq:
-                        print(" @@@@@@@@@@@@@@@ API KEY Expired. %d " % row_seq)
+                        logging.info(" @@@@@@@@@@@@@@@ API KEY Expired. %d " % row_seq)
                         break
                     else:
                         appkey = appkeys[appkey_seq]
-                        print(" @@@@@@@@@@@@@@@ API KEY %s " % appkey)
+                        logging.info(" @@@@@@@@@@@@@@@ API KEY %s " % appkey)
                 except:
+                    logging.info("먼 에러여")
                     pass
 
                 row[6].value = ""
@@ -166,17 +182,17 @@ def main():
             else:
                 row[6].value = ""
 
-        filename = 'result_' + str(file_seq)
-        load_wb.save(resultPath + '/' + filename + '.xlsx')
-        print("Step #6. 엑셀 파일 저장: %s " % (resultPath + '/' + filename + '.xlsx'))
+        filename = xlsxFile[len(xlsxPath + '/'):]
+        # filename = 'naver_' + str(file_seq)
+        load_wb.save(resultPath + '/' + filenamex)
+        logging.info("Step #6. 엑셀 파일 저장: %s " % (resultPath + '/' + filename))
+
+        shutil.move(xlsxFile, xlsxOkPath);
 
         file_seq += 1
 
-        if len(appkeys) < appkey_seq:
-            print("Step #7. API KEY Expired. %s " % xlsxFile)
-            break
 
-    print("Step #7. 끗!!!!!!!!!!!!!!!!!!")
+    logging.info("Step #7. 끗!!!!!!!!!!!!!!!!!!")
 
 
 if __name__ == "__main__":

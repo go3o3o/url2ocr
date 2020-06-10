@@ -8,6 +8,7 @@ import pytesseract
 import io
 import shutil
 import hashlib
+import logging
 import numpy as np
 
 from openpyxl import Workbook
@@ -19,6 +20,8 @@ from urllib import parse
 config = configparser.ConfigParser()
 # Config File 읽기
 config.read(os.path.dirname(os.path.realpath(__file__)) + os.sep + 'envs' + os.sep + 'property.ini')
+
+logging.basicConfig(filename='json2xlsx.log', level=logging.INFO)
 
 def getFiles(path: str, files: list):
     listdirs = os.listdir(path)
@@ -78,13 +81,13 @@ def main():
     file_seq = 1
     xlsx_seq = 1
 
-    print("Step #1. json 파일 전체를 배열에 담기 ")
-    print(" ### %s " % jsonPath)
+    logging.info("Step #1. json 파일 전체를 배열에 담기 ")
+    logging.info(" ### %s " % jsonPath)
     jsonFiles = []
     getFiles(jsonPath, jsonFiles)
-    print(" ### 총 건수 %d " % len(jsonFiles))
+    logging.info(" ### 총 건수 %d " % len(jsonFiles))
 
-    print("Step #2. 엑셀 파일 만들기 %d" % xlsx_seq)
+    logging.info("Step #2. 엑셀 파일 만들기 %d" % xlsx_seq)
     row = 1
     wb = Workbook()
     ws = wb.active
@@ -98,12 +101,12 @@ def main():
 
     for jsonFile in jsonFiles:
         with open(jsonFile) as jsonF:
-            print("Step #3. json 파일 읽기 %d. %s" % (file_seq, jsonFile))
+            logging.info("Step #3. json 파일 읽기 %d. %s" % (file_seq, jsonFile))
             jsonData = json.load(jsonF)
 
             for imgUrl in jsonData['img_url']:
-                print("Step #4. 이미지 URL -> OCR %d" % row)
-                print("Step #4-1. %s " % imgUrl)
+                logging.info("Step #4. 이미지 URL -> OCR %d" % row)
+                logging.info("Step #4-1. %s " % imgUrl)
 
                 try:
                     # response = requests.get(imgUrl)
@@ -113,12 +116,12 @@ def main():
                     ocrResult = ocrToStr(img, 'kor+eng')
                     ocr_yn = 'N'
 
-                    print("Step #4-2. %s " % ocrResult.strip())
+                    logging.info("Step #4-2. %s " % ocrResult.strip())
 
                     if len(ocrResult.strip()) > 5:
                         ocr_yn = 'Y'
 
-                    print("Step #4-3. %s " % ocr_yn)
+                    logging.info("Step #4-3. %s " % ocr_yn)
 
                     row += 1
                     doc_id = md5Generator(jsonData['doc_url'])
@@ -134,17 +137,18 @@ def main():
                 except:
                     pass
 
-        print("Step #5. json 파일 이동 %d. %s" % (file_seq, jsonOkPath))
+
+        logging.info("Step #5. json 파일 이동 %d. %s" % (file_seq, jsonOkPath))
         shutil.move(jsonFile, jsonOkPath)
 
-        if (file_seq > 100):
+        if (file_seq > 1000):
             filename = 'result_' + str(xlsx_seq)
             wb.save(xlsxPath + '/' + filename + '.xlsx')
-            print("Step #6. 엑셀 파일 저장: %s " % (xlsxPath + '/' + filename + '.xlsx'))
+            logging.info("Step #6. 엑셀 파일 저장: %s " % (xlsxPath + '/' + filename + '.xlsx'))
 
             file_seq = 1
             xlsx_seq += 1
-            print("Step #2. 엑셀 파일 만들기 %d" % xlsx_seq)
+            logging.info("Step #2. 엑셀 파일 만들기 %d" % xlsx_seq)
             row = 1
             wb = Workbook()
             ws = wb.active
@@ -155,13 +159,14 @@ def main():
             ws.cell(row, column=5).value = 'img_url'
             ws.cell(row, column=6).value = 'ocr_result'
             ws.cell(row, column=7).value = 'ocr_yn'
+            break
         else:
             file_seq += 1
 
     filename = 'result_' + str(xlsx_seq)
-    wb.save(xlsxPath + '/' + filename + '.xlsx')
-    print("Step #6. 엑셀 파일 저장: %s " % (xlsxPath + '/' + filename + '.xlsx'))
-    print("Step #7. 끗")
+    wb.save(xlsxPath + '/' + filename)
+    logging.info("Step #6. 엑셀 파일 저장: %s " % (xlsxPath + '/' + filename ))
+    logging.info("Step #7. 끗")
 
 if __name__ == "__main__":
     main()
