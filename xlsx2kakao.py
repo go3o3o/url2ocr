@@ -91,10 +91,7 @@ def md5Generator(text: str):
     return encText
 
 def main():
-    # appkeys = ['7a15ba912156cb0a385669ee411e9cf0', '71d3defc02fedccb628e7b97d455f209', 'dfe46d636db22ea56b4bc115ed547cf8']
-    # 호연, 민찬, 서윤, 다정, 재훈
-    appkeys = ['1b59aa1de7bfadd5a19f168141910b1e', 'f3e8ef229676652a83384b661bf2e59c', '7a15ba912156cb0a385669ee411e9cf0', '71d3defc02fedccb628e7b97d455f209', 'dfe46d636db22ea56b4bc115ed547cf8']
-    # appkeys = ['1', '2', '3']
+    appkeys = ['1', '2', '3']
 
     # xlsx 파일 경로
     xlsxPath = os.path.dirname(os.path.realpath(__file__)) + config['Path']['XlsxPath']
